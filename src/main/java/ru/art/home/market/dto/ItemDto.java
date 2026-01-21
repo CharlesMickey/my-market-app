@@ -8,10 +8,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ItemDto {
-    private Long id;
-    private String title;
-    private String description;
-    private String imgPath;
-    private Long price;
+
+    private Long id = -1L;
+    private String title = "";
+    private String description = "";
+    private String imgPath = "";
+    private Long price = 0L;
     private Integer count = 0;
 }
