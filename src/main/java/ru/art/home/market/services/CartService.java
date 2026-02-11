@@ -6,9 +6,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.art.home.market.dto.ItemDto;
 import ru.art.home.market.repositoryes.ItemRepository;
 
@@ -19,56 +20,70 @@ public class CartService {
     private final ItemRepository itemRepository;
     private final OrderService orderService;
 
-    public List<ItemDto> getCartItems(Map<Long, Integer> cartItems) {
-        List<ItemDto> items = new ArrayList<>();
-
-        for (Map.Entry<Long, Integer> entry : cartItems.entrySet()) {
-            itemRepository.findById(entry.getKey()).ifPresent(item -> {
-                ItemDto dto = new ItemDto();
-                dto.setId(item.getId());
-                dto.setTitle(item.getTitle());
-                dto.setDescription(item.getDescription());
-                dto.setImgPath(item.getImgPath());
-                dto.setPrice(item.getPrice());
-                dto.setCount(entry.getValue());
-                items.add(dto);
-            });
+    public Flux<ItemDto> getCartItems(Map<Long, Integer> cartItems) {
+        if (cartItems == null || cartItems.isEmpty()) {
+            return Flux.empty();
         }
 
-        return items;
+        return Flux.fromIterable(cartItems.entrySet())
+                .flatMap(entry -> itemRepository.findById(entry.getKey())
+                        .map(item -> {
+                            ItemDto dto = new ItemDto();
+                            dto.setId(item.getId());
+                            dto.setTitle(item.getTitle());
+                            dto.setDescription(item.getDescription());
+                            dto.setImgPath(item.getImgPath());
+                            dto.setPrice(item.getPrice());
+                            dto.setCount(entry.getValue());
+                            return dto;
+                        }));
     }
 
-    public long calculateTotal(List<ItemDto> cartItems) {
-        return cartItems.stream()
-                .mapToLong(item -> item.getPrice() * item.getCount())
-                .sum();
+    public Mono<Long> calculateTotal(Flux<ItemDto> cartItems) {
+        return cartItems
+                .map(item -> item.getPrice() * item.getCount())
+                .reduce(0L, Long::sum);
     }
+
 
     public Map<Long, Integer> updateCart(Map<Long, Integer> cartItems, Long itemId, String action) {
         Map<Long, Integer> updatedCart = new HashMap<>(cartItems);
         int currentCount = updatedCart.getOrDefault(itemId, 0);
 
         switch (action) {
-            case "PLUS":
-                updatedCart.put(itemId, currentCount + 1);
-                break;
-            case "MINUS":
+            case "PLUS" -> updatedCart.put(itemId, currentCount + 1);
+            case "MINUS" -> {
                 if (currentCount > 1) {
                     updatedCart.put(itemId, currentCount - 1);
                 } else {
                     updatedCart.remove(itemId);
                 }
-                break;
-            case "DELETE":
-                updatedCart.remove(itemId);
-                break;
+            }
+            case "DELETE" -> updatedCart.remove(itemId);
         }
 
         return updatedCart;
     }
 
-    @Transactional
-    public Long createOrder(Map<Long, Integer> cartItems) {
+    public Mono<Long> createOrder(Map<Long, Integer> cartItems) {
         return orderService.createOrder(cartItems);
+    }
+
+
+    public List<List<ItemDto>> groupItemsForDisplay(List<ItemDto> items) {
+        List<List<ItemDto>> groupedItems = new ArrayList<>();
+
+        for (int i = 0; i < items.size(); i += 3) {
+            List<ItemDto> row = new ArrayList<>();
+            for (int j = 0; j < 3 && i + j < items.size(); j++) {
+                row.add(items.get(i + j));
+            }
+            while (row.size() < 3) {
+                row.add(new ItemDto(-1L, "", "", "", 0L, 0));
+            }
+            groupedItems.add(row);
+        }
+
+        return groupedItems;
     }
 }
