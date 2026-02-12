@@ -27,16 +27,16 @@ public class CartService {
 
         return Flux.fromIterable(cartItems.entrySet())
                 .flatMap(entry -> itemRepository.findById(entry.getKey())
-                        .map(item -> {
-                            ItemDto dto = new ItemDto();
-                            dto.setId(item.getId());
-                            dto.setTitle(item.getTitle());
-                            dto.setDescription(item.getDescription());
-                            dto.setImgPath(item.getImgPath());
-                            dto.setPrice(item.getPrice());
-                            dto.setCount(entry.getValue());
-                            return dto;
-                        }));
+                .map(item -> {
+                    ItemDto dto = new ItemDto();
+                    dto.setId(item.getId());
+                    dto.setTitle(item.getTitle());
+                    dto.setDescription(item.getDescription());
+                    dto.setImgPath(item.getImgPath());
+                    dto.setPrice(item.getPrice());
+                    dto.setCount(entry.getValue());
+                    return dto;
+                }));
     }
 
     public Mono<Long> calculateTotal(Flux<ItemDto> cartItems) {
@@ -45,13 +45,13 @@ public class CartService {
                 .reduce(0L, Long::sum);
     }
 
-
     public Map<Long, Integer> updateCart(Map<Long, Integer> cartItems, Long itemId, String action) {
         Map<Long, Integer> updatedCart = new HashMap<>(cartItems);
         int currentCount = updatedCart.getOrDefault(itemId, 0);
 
         switch (action) {
-            case "PLUS" -> updatedCart.put(itemId, currentCount + 1);
+            case "PLUS" ->
+                updatedCart.put(itemId, currentCount + 1);
             case "MINUS" -> {
                 if (currentCount > 1) {
                     updatedCart.put(itemId, currentCount - 1);
@@ -59,7 +59,8 @@ public class CartService {
                     updatedCart.remove(itemId);
                 }
             }
-            case "DELETE" -> updatedCart.remove(itemId);
+            case "DELETE" ->
+                updatedCart.remove(itemId);
         }
 
         return updatedCart;
@@ -68,7 +69,6 @@ public class CartService {
     public Mono<Long> createOrder(Map<Long, Integer> cartItems) {
         return orderService.createOrder(cartItems);
     }
-
 
     public List<List<ItemDto>> groupItemsForDisplay(List<ItemDto> items) {
         List<List<ItemDto>> groupedItems = new ArrayList<>();

@@ -28,16 +28,16 @@ public class OrderService {
 
         return Flux.fromIterable(cartItems.entrySet())
                 .flatMap(entry -> itemRepository.findById(entry.getKey())
-                        .map(item -> {
+                .map(item -> {
 
-                            long totalPrice = item.getPrice() * entry.getValue();
-                            OrderItem oi = new OrderItem();
-                            oi.setItemId(item.getId());
-                            oi.setCount(entry.getValue());
-                            oi.setPrice(item.getPrice());
-                            oi.setOrderId(null);
-                            return new Object[]{oi, totalPrice};
-                        }))
+                    long totalPrice = item.getPrice() * entry.getValue();
+                    OrderItem oi = new OrderItem();
+                    oi.setItemId(item.getId());
+                    oi.setCount(entry.getValue());
+                    oi.setPrice(item.getPrice());
+                    oi.setOrderId(null);
+                    return new Object[]{oi, totalPrice};
+                }))
                 .collectList()
                 .flatMap(list -> {
                     long totalSum = list.stream()
@@ -65,44 +65,44 @@ public class OrderService {
     public Flux<OrderDto> getAllOrders() {
         return orderRepository.findAll()
                 .flatMap(order -> orderItemRepository.findAllByOrderId(order.getId())
-                        .map(oi -> {
-                            OrderItemDto dto = new OrderItemDto();
-                            dto.setId(oi.getItemId());
-                            dto.setTitle("");
-                            dto.setCount(oi.getCount());
-                            dto.setPrice(oi.getPrice());
-                            return dto;
-                        })
-                        .collectList()
-                        .map(list -> {
-                            OrderDto dto = new OrderDto();
-                            dto.setId(order.getId());
-                            dto.setCreatedAt(order.getCreatedAt());
-                            dto.setTotalSum(order.getTotalSum());
-                            dto.setItems(list);
-                            return dto;
-                        }));
+                .map(oi -> {
+                    OrderItemDto dto = new OrderItemDto();
+                    dto.setId(oi.getItemId());
+                    dto.setTitle("");
+                    dto.setCount(oi.getCount());
+                    dto.setPrice(oi.getPrice());
+                    return dto;
+                })
+                .collectList()
+                .map(list -> {
+                    OrderDto dto = new OrderDto();
+                    dto.setId(order.getId());
+                    dto.setCreatedAt(order.getCreatedAt());
+                    dto.setTotalSum(order.getTotalSum());
+                    dto.setItems(list);
+                    return dto;
+                }));
     }
 
     public Mono<OrderDto> getOrderById(Long id) {
         return orderRepository.findById(id)
                 .flatMap(order -> orderItemRepository.findAllByOrderId(order.getId())
-                        .map(oi -> {
-                            OrderItemDto dto = new OrderItemDto();
-                            dto.setId(oi.getItemId());
-                            dto.setTitle("");
-                            dto.setCount(oi.getCount());
-                            dto.setPrice(oi.getPrice());
-                            return dto;
-                        })
-                        .collectList()
-                        .map(list -> {
-                            OrderDto dto = new OrderDto();
-                            dto.setId(order.getId());
-                            dto.setCreatedAt(order.getCreatedAt());
-                            dto.setTotalSum(order.getTotalSum());
-                            dto.setItems(list);
-                            return dto;
-                        }));
+                .map(oi -> {
+                    OrderItemDto dto = new OrderItemDto();
+                    dto.setId(oi.getItemId());
+                    dto.setTitle("");
+                    dto.setCount(oi.getCount());
+                    dto.setPrice(oi.getPrice());
+                    return dto;
+                })
+                .collectList()
+                .map(list -> {
+                    OrderDto dto = new OrderDto();
+                    dto.setId(order.getId());
+                    dto.setCreatedAt(order.getCreatedAt());
+                    dto.setTotalSum(order.getTotalSum());
+                    dto.setItems(list);
+                    return dto;
+                }));
     }
 }

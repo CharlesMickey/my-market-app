@@ -13,7 +13,8 @@
 
 - Java 21
 - Spring Boot 3.5.9
-- Spring Data JPA
+- Webflux
+- R2DBC
 - H2 Database / PostgreSQL
 - Thymeleaf
 - Gradle

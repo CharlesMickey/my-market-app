@@ -13,6 +13,6 @@ public interface ItemRepository extends ReactiveCrudRepository<Item, Long> {
         String lowerSearch = search.toLowerCase();
         return findAll()
                 .filter(item -> item.getTitle().toLowerCase().contains(lowerSearch)
-                        || item.getDescription().toLowerCase().contains(lowerSearch));
+                || item.getDescription().toLowerCase().contains(lowerSearch));
     }
 }
