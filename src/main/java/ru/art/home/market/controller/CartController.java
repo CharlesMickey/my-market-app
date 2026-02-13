@@ -12,10 +12,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.server.WebSession;
 
 import lombok.RequiredArgsConstructor;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.art.home.market.dto.CartItemUpdateRequest;
-import ru.art.home.market.dto.ItemDto;
 import ru.art.home.market.services.CartService;
 
 @Controller
@@ -29,11 +27,8 @@ public class CartController {
     public Mono<String> getCart(WebSession session, Model model) {
         Map<Long, Integer> cartItems = getCartItems(session);
 
-        Flux<ItemDto> itemsFlux = cartService.getCartItems(cartItems);
-        Mono<Long> totalMono = cartService.calculateTotal(itemsFlux);
-
-        model.addAttribute("items", itemsFlux);
-        model.addAttribute("total", totalMono);
+        model.addAttribute("items", cartService.getCartItems(cartItems));
+        model.addAttribute("total", cartService.calculateTotal(cartService.getCartItems(cartItems)));
 
         return Mono.just("cart");
     }
@@ -49,16 +44,12 @@ public class CartController {
         }
 
         Map<Long, Integer> cartItems = getCartItems(session);
-        Map<Long, Integer> updatedCart
-                = cartService.updateCart(cartItems, request.getId(), request.getAction());
+        Map<Long, Integer> updatedCart = cartService.updateCart(cartItems, request.getId(), request.getAction());
 
         session.getAttributes().put("cart", updatedCart);
 
-        Flux<ItemDto> itemsFlux = cartService.getCartItems(updatedCart);
-        Mono<Long> totalMono = cartService.calculateTotal(itemsFlux);
-
-        model.addAttribute("items", itemsFlux);
-        model.addAttribute("total", totalMono);
+        model.addAttribute("items", cartService.getCartItems(updatedCart));
+        model.addAttribute("total", cartService.calculateTotal(cartService.getCartItems(updatedCart)));
 
         return Mono.just("cart");
     }
