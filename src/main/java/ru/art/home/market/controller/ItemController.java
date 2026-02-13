@@ -1,123 +1,156 @@
 package ru.art.home.market.controller;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.server.WebSession;
 
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import ru.art.home.market.dto.ActionRequest;
+import ru.art.home.market.dto.CartUpdateRequest;
 import ru.art.home.market.dto.ItemDto;
 import ru.art.home.market.dto.PagingDto;
+import ru.art.home.market.exception.BadRequestException;
 import ru.art.home.market.services.CartService;
 import ru.art.home.market.services.ItemService;
 
 @Controller
 @RequestMapping("/items")
 @RequiredArgsConstructor
+@Slf4j
 public class ItemController {
 
     private final ItemService itemService;
     private final CartService cartService;
 
     @GetMapping({"", "/"})
-    public String getItems(
+    public Mono<String> getItems(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "NO") String sort,
             @RequestParam(defaultValue = "1") int pageNumber,
             @RequestParam(defaultValue = "5") int pageSize,
-            HttpSession session,
+            WebSession session,
             Model model) {
 
         Map<Long, Integer> cartItems = getCartItems(session);
-        Page<ItemDto> itemsPage = itemService.getItems(search, sort, pageNumber, pageSize, cartItems);
+        Flux<ItemDto> itemsFlux = itemService.getItems(search, cartItems, sort, pageNumber, pageSize);
 
-        List<ItemDto> items = itemsPage.getContent();
-        List<List<ItemDto>> groupedItems = new ArrayList<>();
+        return itemsFlux.collectList().map(items -> {
+            List<List<ItemDto>> groupedItems = cartService.groupItemsForDisplay(items);
 
-        for (int i = 0; i < items.size(); i += 3) {
-            List<ItemDto> row = new ArrayList<>();
-            for (int j = 0; j < 3 && i + j < items.size(); j++) {
-                row.add(items.get(i + j));
-            }
+            PagingDto paging = new PagingDto();
+            paging.setPageSize(pageSize);
+            paging.setPageNumber(pageNumber);
+            paging.setHasPrevious(pageNumber > 1);
+            paging.setHasNext(items.size() >= pageSize);
 
-            while (row.size() < 3) {
-                row.add(new ItemDto(-1L, "", "", "", 0L, 0));
-            }
-            groupedItems.add(row);
-        }
+            model.addAttribute("items", groupedItems);
+            model.addAttribute("search", search);
+            model.addAttribute("sort", sort);
+            model.addAttribute("paging", paging);
 
-        PagingDto paging = new PagingDto();
-        paging.setPageSize(pageSize);
-        paging.setPageNumber(pageNumber);
-        paging.setHasPrevious(itemsPage.hasPrevious());
-        paging.setHasNext(itemsPage.hasNext());
-
-        model.addAttribute("items", groupedItems);
-        model.addAttribute("search", search);
-        model.addAttribute("sort", sort);
-        model.addAttribute("paging", paging);
-
-        return "items";
+            return "items";
+        });
     }
 
     @PostMapping
-    public String updateCartItem(
-            @RequestParam Long id,
-            @RequestParam String action,
-            @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "NO") String sort,
-            @RequestParam(defaultValue = "1") int pageNumber,
-            @RequestParam(defaultValue = "5") int pageSize,
-            HttpSession session) {
+    public Mono<String> updateCartItem(
+            @ModelAttribute CartUpdateRequest request,
+            WebSession session) {
+
+        if (request.getId() == null || request.getAction() == null) {
+            return Mono.error(new BadRequestException("Missing required parameters: id and action"));
+        }
 
         Map<Long, Integer> cartItems = getCartItems(session);
-        cartItems = cartService.updateCart(cartItems, id, action);
-        session.setAttribute("cart", cartItems);
+        Map<Long, Integer> updatedCart = cartService.updateCart(cartItems, request.getId(), request.getAction());
 
-        return String.format("redirect:/items?search=%s&sort=%s&pageNumber=%d&pageSize=%d",
-                search != null ? search : "",
-                sort,
-                pageNumber,
-                pageSize);
+        session.getAttributes().put("cart", updatedCart);
+
+        String redirectUrl = buildRedirectUrl(
+                request.getSearch(),
+                request.getSort(),
+                request.getPageNumber(),
+                request.getPageSize()
+        );
+        return Mono.just(redirectUrl);
+    }
+
+    private String buildRedirectUrl(String search, String sort, Integer pageNumber, Integer pageSize) {
+        StringBuilder url = new StringBuilder("redirect:/items?");
+
+        if (search != null && !search.trim().isEmpty()) {
+            url.append("search=").append(search).append("&");
+        }
+
+        url.append("sort=").append(sort != null ? sort : "NO")
+                .append("&pageNumber=").append(pageNumber != null ? pageNumber : 1)
+                .append("&pageSize=").append(pageSize != null ? pageSize : 5);
+
+        return url.toString();
+    }
+
+    private String buildRedirectUrl(String search, String sort, int pageNumber, int pageSize) {
+        StringBuilder url = new StringBuilder("redirect:/items?");
+
+        if (search != null && !search.trim().isEmpty()) {
+            url.append("search=").append(search).append("&");
+        }
+
+        url.append("sort=").append(sort)
+                .append("&pageNumber=").append(pageNumber)
+                .append("&pageSize=").append(pageSize);
+
+        return url.toString();
     }
 
     @GetMapping("/{id}")
-    public String getItem(@PathVariable Long id, HttpSession session, Model model) {
+    public Mono<String> getItem(@PathVariable Long id, WebSession session, Model model) {
         Map<Long, Integer> cartItems = getCartItems(session);
-        ItemDto item = itemService.getItemById(id, cartItems);
-        model.addAttribute("item", item);
-        return "item";
+        return itemService.getItemById(id, cartItems)
+                .map(item -> {
+                    model.addAttribute("item", item);
+                    return "item";
+                });
     }
 
     @PostMapping("/{id}")
-    public String updateItemInCart(
+    public Mono<String> updateItemInCart(
             @PathVariable Long id,
-            @RequestParam String action,
-            HttpSession session,
+            @ModelAttribute ActionRequest request,
+            WebSession session,
             Model model) {
 
+        if (request.getAction() == null || request.getAction().trim().isEmpty()) {
+            return Mono.error(new BadRequestException("Missing required parameter: action"));
+        }
         Map<Long, Integer> cartItems = getCartItems(session);
-        cartItems = cartService.updateCart(cartItems, id, action);
-        session.setAttribute("cart", cartItems);
+        Map<Long, Integer> updatedCart
+                = cartService.updateCart(cartItems, id, request.getAction());
 
-        ItemDto item = itemService.getItemById(id, cartItems);
-        model.addAttribute("item", item);
-        return "item";
+        session.getAttributes().put("cart", updatedCart);
+
+        return itemService.getItemById(id, updatedCart)
+                .map(item -> {
+                    model.addAttribute("item", item);
+                    return "item";
+                });
     }
 
-    private Map<Long, Integer> getCartItems(HttpSession session) {
-        @SuppressWarnings("unchecked")
-        Map<Long, Integer> cartItems = (Map<Long, Integer>) session.getAttribute("cart");
+    private Map<Long, Integer> getCartItems(WebSession session) {
+        Map<Long, Integer> cartItems = session.getAttribute("cart");
         return cartItems != null ? cartItems : new HashMap<>();
     }
 }

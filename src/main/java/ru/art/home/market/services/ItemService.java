@@ -1,16 +1,14 @@
 package ru.art.home.market.services;
 
+import java.util.Comparator;
 import java.util.Map;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import ru.art.home.market.dto.ItemDto;
-import ru.art.home.market.exception.NotFoundException;
 import ru.art.home.market.model.Item;
 import ru.art.home.market.repositoryes.ItemRepository;
 
@@ -20,39 +18,42 @@ public class ItemService {
 
     private final ItemRepository itemRepository;
 
-    public Page<ItemDto> getItems(String search, String sort, int pageNumber, int pageSize,
-            Map<Long, Integer> cartItems) {
-        Pageable pageable = createPageable(sort, pageNumber, pageSize);
-        Page<Item> itemsPage;
+    public Flux<ItemDto> getItems(String search, Map<Long, Integer> cartItems, String sort, int pageNumber, int pageSize) {
+        Flux<Item> itemsFlux;
 
-        if (search != null && !search.trim().isEmpty()) {
-            itemsPage = itemRepository.findBySearch(search.trim(), pageable);
+        if (search != null && !search.isBlank()) {
+            itemsFlux = itemRepository.findBySearch(search);
         } else {
-            itemsPage = itemRepository.findAll(pageable);
+            itemsFlux = itemRepository.findAll();
         }
-
-        return itemsPage.map(item -> convertToDto(item, cartItems));
-    }
-
-    public ItemDto getItemById(Long id, Map<Long, Integer> cartItems) {
-        Item item = itemRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Item not found"));
-        return convertToDto(item, cartItems);
-    }
-
-    private Pageable createPageable(String sort, int pageNumber, int pageSize) {
-        Sort sorting = Sort.unsorted();
 
         if ("ALPHA".equals(sort)) {
-            sorting = Sort.by("title").ascending();
+            itemsFlux = itemsFlux.sort(Comparator.comparing(Item::getTitle, String.CASE_INSENSITIVE_ORDER));
         } else if ("PRICE".equals(sort)) {
-            sorting = Sort.by("price").ascending();
+            itemsFlux = itemsFlux.sort(Comparator.comparingLong(Item::getPrice));
         }
 
-        return PageRequest.of(pageNumber - 1, pageSize, sorting);
+        int skip = (pageNumber - 1) * pageSize;
+        itemsFlux = itemsFlux.skip(skip).take(pageSize);
+
+        return itemsFlux.map(item -> {
+            ItemDto dto = new ItemDto();
+            dto.setId(item.getId());
+            dto.setTitle(item.getTitle());
+            dto.setDescription(item.getDescription());
+            dto.setImgPath(item.getImgPath());
+            dto.setPrice(item.getPrice());
+            dto.setCount(cartItems.getOrDefault(item.getId(), 0));
+            return dto;
+        });
     }
 
-    private ItemDto convertToDto(Item item, Map<Long, Integer> cartItems) {
+    public Mono<ItemDto> getItemById(Long id, Map<Long, Integer> cartItems) {
+        return itemRepository.findById(id)
+                .map(item -> toDto(item, cartItems));
+    }
+
+    private ItemDto toDto(Item item, Map<Long, Integer> cartItems) {
         ItemDto dto = new ItemDto();
         dto.setId(item.getId());
         dto.setTitle(item.getTitle());
@@ -61,5 +62,15 @@ public class ItemService {
         dto.setPrice(item.getPrice());
         dto.setCount(cartItems.getOrDefault(item.getId(), 0));
         return dto;
+    }
+
+    private Comparator<Item> getComparator(String sort) {
+        if ("ALPHA".equalsIgnoreCase(sort)) {
+            return Comparator.comparing(Item::getTitle, String.CASE_INSENSITIVE_ORDER);
+        } else if ("PRICE".equalsIgnoreCase(sort)) {
+            return Comparator.comparingLong(Item::getPrice);
+        } else {
+            return Comparator.comparing(Item::getId);
+        }
     }
 }
