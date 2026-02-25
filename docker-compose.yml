@@ -1,5 +1,55 @@
+version: '3.8'
+
 services:
-  app:
-    build: .
+  redis:
+    image: redis:7-alpine
+    container_name: bom-bom-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - bom-bom-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  market-app:
+    build:
+      context: .
+      dockerfile: market-app/Dockerfile
+    container_name: bom-bom-market
     ports:
       - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - PAYMENT_SERVICE_URL=http://payment-service:8082
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - bom-bom-network
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+    container_name: bom-bom-payment
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - PAYMENT_SERVICE_INITIAL_BALANCE=100000
+    networks:
+      - bom-bom-network
+
+volumes:
+  redis-data:
+
+networks:
+  bom-bom-network:
+    driver: bridge
