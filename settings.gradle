@@ -1,1 +1,4 @@
-rootProject.name = 'market'
+rootProject.name = 'bom-bom-market'
+
+include 'market-app'
+include 'payment-service'

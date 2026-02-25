@@ -7,6 +7,19 @@ spring:
     username: sa
     password:
 
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:redis}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password:
+      timeout: 60s
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+
   sql:
     init:
       platform: h2
@@ -28,13 +41,21 @@ spring:
       max-file-size: 2MB
       max-request-size: 2MB
 
+  cache:
+    type: redis
+    redis:
+      time-to-live: 120000
+
 server:
   port: 8080
+
+payment:
+  service:
+    url: http://payment-service:8081
 
 logging:
   level:
     org.springframework: INFO
-    org.springframework.web: DEBUG
-    org.springframework.web.reactive: DEBUG
+    org.springframework.data.redis: DEBUG
     ru.art.home.market: DEBUG
     reactor.netty: DEBUG

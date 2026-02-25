@@ -17,7 +17,7 @@ dependencies {
 
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis-reactive'
 	implementation 'org.springdoc:springdoc-openapi-starter-webflux-ui:2.8.5'
-	implementation 'org.apache.commons:commons-pool2' // Для пула соединений Redis
+	implementation 'org.apache.commons:commons-pool2'
 
 
 	implementation 'org.openapitools:jackson-databind-nullable:0.2.6'
@@ -38,7 +38,7 @@ dependencies {
 openApiGenerate {
 	generatorName = "java"
 	inputSpec = "$rootDir/openapi/payment-api.yaml".toString()
-	outputDir = "$buildDir/generated".toString()
+	outputDir = layout.buildDirectory.dir("generated").get().asFile.toString()
 	apiPackage = "ru.art.home.market.payment.client.api"
 	invokerPackage = "ru.art.home.market.payment.client.invoker"
 	modelPackage = "ru.art.home.market.payment.client.model"
@@ -53,11 +53,10 @@ openApiGenerate {
 	]
 }
 
-
 sourceSets {
 	main {
 		java {
-			srcDir "$buildDir/generated/src/main/java"
+			srcDir layout.buildDirectory.dir("generated/src/main/java")
 		}
 	}
 }

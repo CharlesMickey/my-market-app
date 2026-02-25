@@ -24,6 +24,7 @@ import ru.art.home.market.dto.ItemDto;
 import ru.art.home.market.dto.PagingDto;
 import ru.art.home.market.exception.BadRequestException;
 import ru.art.home.market.services.CartService;
+import ru.art.home.market.services.ItemCacheService;
 import ru.art.home.market.services.ItemService;
 
 @Controller
@@ -34,6 +35,7 @@ public class ItemController {
 
     private final ItemService itemService;
     private final CartService cartService;
+    private final ItemCacheService itemCacheService;
 
     @GetMapping({"", "/"})
     public Mono<String> getItems(
@@ -45,7 +47,8 @@ public class ItemController {
             Model model) {
 
         Map<Long, Integer> cartItems = getCartItems(session);
-        Flux<ItemDto> itemsFlux = itemService.getItems(search, cartItems, sort, pageNumber, pageSize);
+
+        Flux<ItemDto> itemsFlux = itemCacheService.getItems(search, cartItems, sort, pageNumber, pageSize);
 
         return itemsFlux.collectList().map(items -> {
             List<List<ItemDto>> groupedItems = cartService.groupItemsForDisplay(items);
@@ -54,6 +57,7 @@ public class ItemController {
             paging.setPageSize(pageSize);
             paging.setPageNumber(pageNumber);
             paging.setHasPrevious(pageNumber > 1);
+
             paging.setHasNext(items.size() >= pageSize);
 
             model.addAttribute("items", groupedItems);
@@ -119,7 +123,7 @@ public class ItemController {
     @GetMapping("/{id}")
     public Mono<String> getItem(@PathVariable Long id, WebSession session, Model model) {
         Map<Long, Integer> cartItems = getCartItems(session);
-        return itemService.getItemById(id, cartItems)
+        return itemCacheService.getItemById(id, cartItems)
                 .map(item -> {
                     model.addAttribute("item", item);
                     return "item";

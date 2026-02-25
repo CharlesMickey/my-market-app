@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.server.WebSession;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 import ru.art.home.market.dto.CartItemUpdateRequest;
 import ru.art.home.market.services.CartService;
@@ -19,6 +20,7 @@ import ru.art.home.market.services.CartService;
 @Controller
 @RequestMapping("/cart")
 @RequiredArgsConstructor
+@Slf4j
 public class CartController {
 
     private final CartService cartService;
@@ -27,10 +29,24 @@ public class CartController {
     public Mono<String> getCart(WebSession session, Model model) {
         Map<Long, Integer> cartItems = getCartItems(session);
 
-        model.addAttribute("items", cartService.getCartItems(cartItems));
-        model.addAttribute("total", cartService.calculateTotal(cartService.getCartItems(cartItems)));
+        return cartService.getCartItems(cartItems)
+                .collectList()
+                .flatMap(items -> {
+                    model.addAttribute("items", items);
 
-        return Mono.just("cart");
+                    return cartService.calculateTotal(cartService.getCartItems(cartItems))
+                            .flatMap(total -> {
+                                model.addAttribute("total", total);
+                                return cartService.getPaymentStatusMessage(cartItems)
+                                        .doOnNext(message -> {
+                                            model.addAttribute("paymentStatus", message);
+                                            model.addAttribute("canPay",
+                                                    message.equals("Достаточно средств для оплаты"));
+                                        })
+                                        .thenReturn("cart");
+                            });
+                })
+                .switchIfEmpty(Mono.just("cart"));
     }
 
     @PostMapping("/items")
@@ -48,10 +64,24 @@ public class CartController {
 
         session.getAttributes().put("cart", updatedCart);
 
-        model.addAttribute("items", cartService.getCartItems(updatedCart));
-        model.addAttribute("total", cartService.calculateTotal(cartService.getCartItems(updatedCart)));
+        return cartService.getCartItems(updatedCart)
+                .collectList()
+                .flatMap(items -> {
+                    model.addAttribute("items", items);
 
-        return Mono.just("cart");
+                    return cartService.calculateTotal(cartService.getCartItems(updatedCart))
+                            .flatMap(total -> {
+                                model.addAttribute("total", total);
+
+                                return cartService.getPaymentStatusMessage(updatedCart)
+                                        .doOnNext(message -> {
+                                            model.addAttribute("paymentStatus", message);
+                                            model.addAttribute("canPay",
+                                                    message.equals("Достаточно средств для оплаты"));
+                                        })
+                                        .thenReturn("cart");
+                            });
+                });
     }
 
     private Map<Long, Integer> getCartItems(WebSession session) {
