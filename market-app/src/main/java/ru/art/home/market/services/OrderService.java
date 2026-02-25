@@ -31,15 +31,15 @@ public class OrderService {
     public Mono<Long> createOrder(Map<Long, Integer> cartItems) {
         return Flux.fromIterable(cartItems.entrySet())
                 .flatMap(entry -> itemRepository.findById(entry.getKey())
-                .map(item -> {
-                    OrderItem oi = new OrderItem();
-                    oi.setItemId(item.getId());
-                    oi.setCount(entry.getValue());
-                    oi.setPrice(item.getPrice());
-                    oi.setOrderId(null);
-                    long totalPrice = item.getPrice() * entry.getValue();
-                    return new ItemOrderData(oi, totalPrice);
-                }))
+                        .map(item -> {
+                            OrderItem oi = new OrderItem();
+                            oi.setItemId(item.getId());
+                            oi.setCount(entry.getValue());
+                            oi.setPrice(item.getPrice());
+                            oi.setOrderId(null);
+                            long totalPrice = item.getPrice() * entry.getValue();
+                            return new ItemOrderData(oi, totalPrice);
+                        }))
                 .collectList()
                 .flatMap(list -> {
                     long totalSum = list.stream()
@@ -73,17 +73,21 @@ public class OrderService {
                 .flatMap(this::enhanceOrderWithItems);
     }
 
+    public Mono<Void> deleteOrder(Long id) {
+        return orderRepository.deleteById(id);
+    }
+
     private Mono<OrderDto> enhanceOrderWithItems(Order order) {
         return orderItemRepository.findAllByOrderId(order.getId())
                 .flatMap(oi -> itemRepository.findById(oi.getItemId())
-                .map(item -> {
-                    OrderItemDto dto = new OrderItemDto();
-                    dto.setId(oi.getItemId());
-                    dto.setTitle(item.getTitle());
-                    dto.setCount(oi.getCount());
-                    dto.setPrice(oi.getPrice());
-                    return dto;
-                })
+                        .map(item -> {
+                            OrderItemDto dto = new OrderItemDto();
+                            dto.setId(oi.getItemId());
+                            dto.setTitle(item.getTitle());
+                            dto.setCount(oi.getCount());
+                            dto.setPrice(oi.getPrice());
+                            return dto;
+                        })
                 )
                 .collectList()
                 .map(items -> {

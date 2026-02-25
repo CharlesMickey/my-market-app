@@ -1,4 +1,4 @@
-package ru.art.home.payment.controller;
+package ru.art.home.payment.controllers;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
