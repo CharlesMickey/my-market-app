@@ -31,16 +31,16 @@ public class CartService {
 
         return Flux.fromIterable(cartItems.entrySet())
                 .flatMap(entry -> itemRepository.findById(entry.getKey())
-                        .map(item -> {
-                            ItemDto dto = new ItemDto();
-                            dto.setId(item.getId());
-                            dto.setTitle(item.getTitle());
-                            dto.setDescription(item.getDescription());
-                            dto.setImgPath(item.getImgPath());
-                            dto.setPrice(item.getPrice());
-                            dto.setCount(entry.getValue());
-                            return dto;
-                        }));
+                .map(item -> {
+                    ItemDto dto = new ItemDto();
+                    dto.setId(item.getId());
+                    dto.setTitle(item.getTitle());
+                    dto.setDescription(item.getDescription());
+                    dto.setImgPath(item.getImgPath());
+                    dto.setPrice(item.getPrice());
+                    dto.setCount(entry.getValue());
+                    return dto;
+                }));
     }
 
     public Mono<Long> calculateTotal(Flux<ItemDto> cartItems) {
@@ -55,7 +55,7 @@ public class CartService {
 
         switch (action) {
             case "PLUS" ->
-                    updatedCart.put(itemId, currentCount + 1);
+                updatedCart.put(itemId, currentCount + 1);
             case "MINUS" -> {
                 if (currentCount > 1) {
                     updatedCart.put(itemId, currentCount - 1);
@@ -64,7 +64,7 @@ public class CartService {
                 }
             }
             case "DELETE" ->
-                    updatedCart.remove(itemId);
+                updatedCart.remove(itemId);
         }
 
         return updatedCart;
@@ -104,11 +104,10 @@ public class CartService {
                             .sum();
 
                     return paymentServiceClient.getBalance()
-                            .map(balance -> balance.getBalance() >= total)
+                            .map(balance -> balance.balance() >= total)
                             .onErrorReturn(PaymentServiceUnavailableException.class, false);
                 });
     }
-
 
     public Mono<String> getPaymentStatusMessage(Map<Long, Integer> cartItems) {
         if (cartItems == null || cartItems.isEmpty()) {
@@ -130,10 +129,10 @@ public class CartService {
 
                                 return paymentServiceClient.getBalance()
                                         .map(balance -> {
-                                            if (balance.getBalance() >= total) {
+                                            if (balance.balance() >= total) {
                                                 return "Достаточно средств для оплаты";
                                             } else {
-                                                double needAmount = (total - balance.getBalance()) / 100.0;
+                                                double needAmount = (total - balance.balance()) / 100.0;
                                                 return String.format("Недостаточно средств. Нужно ещё %.2f RUB", needAmount);
                                             }
                                         })
@@ -165,12 +164,12 @@ public class CartService {
 
                                 return paymentServiceClient.processPayment(paymentRequest)
                                         .flatMap(response -> {
-                                            if (response.getSuccess()) {
+                                            if (response.success()) {
                                                 return Mono.just(orderId);
                                             } else {
-                                                  return orderService.deleteOrder(orderId)
+                                                return orderService.deleteOrder(orderId)
                                                         .then(Mono.error(new RuntimeException(
-                                                                "Payment failed: " + response.getMessage())));
+                                                                "Payment failed: " + response.message())));
                                             }
                                         });
                             });

@@ -39,35 +39,47 @@ public class PaymentService {
                 throw new IllegalArgumentException("Amount must be positive");
             }
 
-            long currentBalance = balance.get();
+            while (true) {
+                long currentBalance = balance.get();
 
-            if (currentBalance < amount) {
-                Transaction failedTx = Transaction.createFailed(
-                        orderId,
-                        amount,
-                        currentBalance,
-                        Transaction.TransactionStatus.FAILED_INSUFFICIENT_FUNDS,
-                        "Insufficient funds"
-                );
-                transactions.put(failedTx.getId(), failedTx);
-                log.warn("Payment failed for order {}: insufficient funds (balance={}, required={})",
-                        orderId, currentBalance, amount);
-                return failedTx;
+                if (currentBalance < amount) {
+                    Transaction failedTx = Transaction.createFailed(
+                            orderId,
+                            amount,
+                            currentBalance,
+                            Transaction.TransactionStatus.FAILED_INSUFFICIENT_FUNDS,
+                            "Insufficient funds"
+                    );
+                    transactions.put(failedTx.getId(), failedTx);
+
+                    log.warn("Payment failed for order {}: insufficient funds (balance={}, required={})",
+                            orderId, currentBalance, amount);
+
+                    return failedTx;
+                }
+
+                long newBalance = currentBalance - amount;
+
+                if (balance.compareAndSet(currentBalance, newBalance)) {
+
+                    Transaction successTx = Transaction.createSuccess(
+                            orderId,
+                            amount,
+                            currentBalance,
+                            newBalance,
+                            description != null
+                                    ? description
+                                    : "Payment for order #" + orderId
+                    );
+
+                    transactions.put(successTx.getId(), successTx);
+
+                    log.info("Payment successful for order {}: new balance={}",
+                            orderId, newBalance);
+
+                    return successTx;
+                }
             }
-
-            long newBalance = balance.addAndGet(-amount);
-
-            Transaction successTx = Transaction.createSuccess(
-                    orderId,
-                    amount,
-                    currentBalance,
-                    newBalance,
-                    description != null ? description : "Payment for order #" + orderId
-            );
-            transactions.put(successTx.getId(), successTx);
-
-            log.info("Payment successful for order {}: new balance={}", orderId, newBalance);
-            return successTx;
         });
     }
 

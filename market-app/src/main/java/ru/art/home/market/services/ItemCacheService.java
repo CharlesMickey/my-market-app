@@ -28,6 +28,7 @@ public class ItemCacheService {
 
     private static final String ITEM_KEY_PREFIX = "item:";
     private static final String ITEMS_LIST_KEY = "items:all";
+    private static final String ITEM_KEY_PATTERN = ITEM_KEY_PREFIX + "*";
     private static final Duration CACHE_TTL = Duration.ofMinutes(2);
 
     public Mono<ItemDto> getItemById(Long id, Map<Long, Integer> cartItems) {
@@ -85,7 +86,6 @@ public class ItemCacheService {
                 );
     }
 
-
     public Flux<Item> searchItems(String search) {
         return getAllItems()
                 .filter(item
@@ -96,7 +96,15 @@ public class ItemCacheService {
     }
 
     public Mono<Void> invalidateCache() {
-        return redisTemplate.delete(ITEM_KEY_PREFIX + "*")
+        // Пишут redisTemplate.delete - не отработает ожидаемо
+        return redisTemplate.keys(ITEM_KEY_PATTERN)
+                .collectList()
+                .flatMapMany(keys -> {
+                    if (keys.isEmpty()) {
+                        return Flux.empty();
+                    }
+                    return redisTemplate.delete(keys.toArray(new String[0]));
+                })
                 .then(redisTemplate.delete(ITEMS_LIST_KEY))
                 .then();
     }

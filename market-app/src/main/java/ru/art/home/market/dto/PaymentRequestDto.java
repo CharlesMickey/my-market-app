@@ -1,15 +1,9 @@
 package ru.art.home.market.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+public record PaymentRequestDto(
+        Long orderId,
+        Long amount,
+        String description
+        ) {
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class PaymentRequestDto {
-
-    private Long orderId;
-    private Long amount;
-    private String description;
 }

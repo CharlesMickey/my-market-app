@@ -1,12 +1,10 @@
 package ru.art.home.market.dto;
 
-import lombok.Data;
+public record PaymentResponseDto(
+        Boolean success,
+        String transactionId,
+        Long newBalance,
+        String message
+        ) {
 
-@Data
-public class PaymentResponseDto {
-
-    private Boolean success;
-    private String transactionId;
-    private Long newBalance;
-    private String message;
 }

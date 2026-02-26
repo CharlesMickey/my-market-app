@@ -39,7 +39,7 @@ public class PaymentServiceClient {
     }
 
     public Mono<PaymentResponseDto> processPayment(PaymentRequestDto request) {
-        log.debug("Processing payment: orderId={}, amount={}", request.getOrderId(), request.getAmount());
+        log.debug("Processing payment: orderId={}, amount={}", request.orderId(), request.amount());
 
         return paymentWebClient.post()
                 .uri("/api/v1/payments")

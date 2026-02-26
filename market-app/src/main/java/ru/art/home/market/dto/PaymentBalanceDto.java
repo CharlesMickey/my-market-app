@@ -1,10 +1,8 @@
 package ru.art.home.market.dto;
 
-import lombok.Data;
+public record PaymentBalanceDto(
+        Long balance,
+        String currency
+        ) {
 
-@Data
-public class PaymentBalanceDto {
-
-    private Long balance;
-    private String currency;
 }
