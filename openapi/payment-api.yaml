@@ -1,0 +1,160 @@
+openapi: 3.0.3
+info:
+  title: Payment Service API
+  description: API для сервиса платежей интернет-магазина
+  version: 1.0.0
+  contact:
+    name: Art Home Market
+    url: https://github.com/art-home/market
+
+servers:
+  - url: http://localhost:8082/api/v1
+    description: Локальный сервер разработки
+
+tags:
+  - name: payment
+    description: Операции с платежами
+
+paths:
+  /balance:
+    get:
+      tags:
+        - payment
+      summary: Получение текущего баланса
+      operationId: getBalance
+      responses:
+        '200':
+          description: Успешный ответ с балансом
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /payments:
+    post:
+      tags:
+        - payment
+      summary: Осуществление платежа
+      operationId: processPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '200':
+          description: Платеж успешно обработан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Недостаточно средств или некорректный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    BalanceResponse:
+      type: object
+      required:
+        - balance
+      properties:
+        balance:
+          type: integer
+          format: int64
+          description: Текущий баланс в копейках
+          example: 100000
+        currency:
+          type: string
+          description: Валюта
+          default: "RUB"
+          example: "RUB"
+
+    PaymentRequest:
+      type: object
+      required:
+        - amount
+        - orderId
+      properties:
+        amount:
+          type: integer
+          format: int64
+          description: Сумма платежа в копейках
+          minimum: 1
+          example: 2999
+        orderId:
+          type: integer
+          format: int64
+          description: Идентификатор заказа
+          example: 1
+        description:
+          type: string
+          description: Описание платежа
+          example: "Оплата заказа №1"
+
+    PaymentResponse:
+      type: object
+      required:
+        - success
+        - transactionId
+      properties:
+        success:
+          type: boolean
+          description: Успешность платежа
+          example: true
+        transactionId:
+          type: string
+          description: Идентификатор транзакции
+          example: "txn_123456789"
+        newBalance:
+          type: integer
+          format: int64
+          description: Новый баланс после платежа
+          example: 97001
+        message:
+          type: string
+          description: Сообщение о результате
+          example: "Платеж успешно обработан"
+
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Код ошибки
+          example: "INSUFFICIENT_FUNDS"
+        message:
+          type: string
+          description: Описание ошибки
+          example: "Недостаточно средств на счете"
+        timestamp:
+          type: string
+          format: date-time
+          description: Время возникновения ошибки
+
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+
+security:
+  - basicAuth: []

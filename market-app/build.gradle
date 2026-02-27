@@ -1,0 +1,64 @@
+plugins {
+	id 'org.springframework.boot' version '3.5.9'
+	id 'io.spring.dependency-management' version '1.1.7'
+	id 'org.openapi.generator' version '7.12.0'
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-webflux'
+	implementation 'org.springframework.boot:spring-boot-starter-data-r2dbc'
+	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-cache'
+	implementation 'org.springframework.session:spring-session-core'
+	runtimeOnly 'io.r2dbc:r2dbc-h2'
+	runtimeOnly 'com.h2database:h2'
+
+
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis-reactive'
+	implementation 'org.springdoc:springdoc-openapi-starter-webflux-ui:2.8.5'
+	implementation 'org.apache.commons:commons-pool2'
+
+
+	implementation 'org.openapitools:jackson-databind-nullable:0.2.6'
+	implementation 'io.projectreactor.netty:reactor-netty-http'
+	implementation 'org.springframework:spring-webflux'
+
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'io.projectreactor:reactor-test'
+	testImplementation 'org.testcontainers:testcontainers:1.20.6'
+	testImplementation 'org.testcontainers:junit-jupiter:1.20.6'
+	testImplementation 'org.testcontainers:r2dbc:1.20.6'
+}
+
+
+openApiGenerate {
+	generatorName = "java"
+	inputSpec = "$rootDir/openapi/payment-api.yaml".toString()
+	outputDir = layout.buildDirectory.dir("generated").get().asFile.toString()
+	apiPackage = "ru.art.home.market.payment.client.api"
+	invokerPackage = "ru.art.home.market.payment.client.invoker"
+	modelPackage = "ru.art.home.market.payment.client.model"
+	library = "webclient"
+	configOptions = [
+			reactive: "true",
+			useJakartaEe: "true",
+			dateLibrary: "java8",
+			java21: "true",
+			hideGenerationTimestamp: "true",
+			serializableModel: "true"
+	]
+}
+
+sourceSets {
+	main {
+		java {
+			srcDir layout.buildDirectory.dir("generated/src/main/java")
+		}
+	}
+}
+
+compileJava.dependsOn tasks.openApiGenerate
