@@ -2,6 +2,13 @@ spring:
   application:
     name: payment-service
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8085/realms/bom-bom-market
+          jwk-set-uri: http://localhost:8085/realms/bom-bom-market/protocol/openid-connect/certs
+
 server:
   port: 8082
 
@@ -12,10 +19,8 @@ payment:
 logging:
   level:
     org.springframework: INFO
-    org.springframework.web: DEBUG
-    org.springframework.web.reactive: DEBUG
+    org.springframework.security: DEBUG
     ru.art.home.payment: DEBUG
-    reactor.netty: DEBUG
 
 management:
   endpoints:

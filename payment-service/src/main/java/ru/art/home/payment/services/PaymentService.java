@@ -15,29 +15,43 @@ import java.util.concurrent.atomic.AtomicLong;
 @Slf4j
 public class PaymentService {
 
-    private final AtomicLong balance;
-    private final Map<String, Transaction> transactions = new ConcurrentHashMap<>();
+    private final Map<String, AtomicLong> clientBalances = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, Transaction>> clientTransactions = new ConcurrentHashMap<>();
+    private final Long initialBalance;
 
     public PaymentService(@Value("${payment.service.initial-balance:100000}") Long initialBalance) {
-        this.balance = new AtomicLong(initialBalance);
-        log.info("Payment service initialized with balance: {} RUB", initialBalance / 100.0);
+        this.initialBalance = initialBalance;
+        log.info("Payment service initialized with initial balance: {} RUB", initialBalance / 100.0);
     }
 
-    public Mono<Balance> getBalance() {
+    private AtomicLong getClientBalance(String clientId) {
+        return clientBalances.computeIfAbsent(clientId,
+                k -> new AtomicLong(initialBalance));
+    }
+
+    private Map<String, Transaction> getClientTransactions(String clientId) {
+        return clientTransactions.computeIfAbsent(clientId,
+                k -> new ConcurrentHashMap<>());
+    }
+
+    public Mono<Balance> getBalance(String clientId) {
         return Mono.fromCallable(() -> {
             Balance balanceObj = new Balance();
-            balanceObj.setAmount(balance.get());
+            balanceObj.setAmount(getClientBalance(clientId).get());
             return balanceObj;
         });
     }
 
-    public Mono<Transaction> processPayment(Long orderId, Long amount, String description) {
+    public Mono<Transaction> processPayment(String clientId, Long orderId, Long amount, String description) {
         return Mono.fromCallable(() -> {
-            log.info("Processing payment for order {}: amount={}", orderId, amount);
+            log.info("Processing payment for client {} order {}: amount={}", clientId, orderId, amount);
 
             if (amount <= 0) {
                 throw new IllegalArgumentException("Amount must be positive");
             }
+
+            AtomicLong balance = getClientBalance(clientId);
+            Map<String, Transaction> transactions = getClientTransactions(clientId);
 
             while (true) {
                 long currentBalance = balance.get();
@@ -52,8 +66,8 @@ public class PaymentService {
                     );
                     transactions.put(failedTx.getId(), failedTx);
 
-                    log.warn("Payment failed for order {}: insufficient funds (balance={}, required={})",
-                            orderId, currentBalance, amount);
+                    log.warn("Payment failed for client {} order {}: insufficient funds (balance={}, required={})",
+                            clientId, orderId, currentBalance, amount);
 
                     return failedTx;
                 }
@@ -74,8 +88,8 @@ public class PaymentService {
 
                     transactions.put(successTx.getId(), successTx);
 
-                    log.info("Payment successful for order {}: new balance={}",
-                            orderId, newBalance);
+                    log.info("Payment successful for client {} order {}: new balance={}",
+                            clientId, orderId, newBalance);
 
                     return successTx;
                 }
@@ -83,15 +97,15 @@ public class PaymentService {
         });
     }
 
-    public Mono<Transaction> getTransaction(String transactionId) {
-        return Mono.justOrEmpty(transactions.get(transactionId));
+    public Mono<Transaction> getTransaction(String clientId, String transactionId) {
+        return Mono.justOrEmpty(getClientTransactions(clientId).get(transactionId));
     }
 
-    public Mono<Balance> deposit(Long amount) {
+    public Mono<Balance> deposit(String clientId, Long amount) {
         if (amount <= 0) {
             return Mono.error(new IllegalArgumentException("Amount must be positive"));
         }
-        long newBalance = balance.addAndGet(amount);
-        return getBalance();
+        long newBalance = getClientBalance(clientId).addAndGet(amount);
+        return getBalance(clientId);
     }
 }
