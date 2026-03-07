@@ -1,7 +1,5 @@
 package ru.art.home.market.model;
 
-import java.time.LocalDateTime;
-
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -9,15 +7,14 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Table("orders")
+@Table("authorities")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Order {
+public class Authority {
 
     @Id
     private Long id;
-    private Long userId;
-    private LocalDateTime createdAt;
-    private Long totalSum;
+    private String username;
+    private String authority;
 }

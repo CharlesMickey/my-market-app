@@ -5,9 +5,10 @@
 ## Функциональность
 
 - Просмотр товаров с пагинацией, поиском и сортировкой (с кэшированием в Redis)
-- Добавление товаров в корзину
+- Добавление товаров в корзину (только для авторизованных пользователей)
 - Оформление заказов с проверкой баланса через сервис платежей
-- Просмотр истории заказов
+- Просмотр истории заказов (привязана к конкретному пользователю)
+- Авторизация пользователей по логину/паролю
 
 ## Технологии
 
@@ -16,38 +17,53 @@
 - Webflux
 - R2DBC
 - H2 Database
-- Redis
+- Redisа
 - Thymeleaf
+- Keycloak
 - Gradle
 - Docker
 
 ## Запуск приложения
 
-### Локально с H2 и Redis
-
-```bash
- 
- docker run -d --name redis -p 6379:6379 redis:7-alpine
-
-./gradlew :payment-service:bootRun
-
-./gradlew :market-app:bootRun
-
-./gradlew clean build
-```
-
 ### Запуск в Docker
 
 ```bash
+# Шаг 1: Запуск Redis и Keycloak
+docker compose up -d redis keycloak
+
+# Шаг 2: Настройка Keycloak (один раз)
+# http://localhost:8085 (admin/admin)
+# Создать realm: bom-bom-market
+# Создайте клиента market-app:
+# Client ID: market-app
+# Client authentication: ON
+# Service accounts roles: ON
+# Valid redirect URIs: http://localhost:8080/*
+# Создайте клиента payment-service (также)
+# Перейдите в Clients → market-app → Credentials
+# Скопируйте Client secret (при start-dev не требуется)
+
+# Шаг 3: Создать .env файл с секретом (главное без BOM иначе не взлетит)
+echo "KEYCLOAK_CLIENT_SECRET=скопированный_секрет" > .env 
+
+# Шаг 4: Запуск всех сервисов
 docker compose up -d
 
+# Просмотр логов
+docker compose logs -f
+
+# Остановка
+docker compose down
 ```
 
 ### Доступ к приложениям
 
 - **Основное приложение**: http://localhost:8080
-- **Платежный сервис**: http://localhost:8082/api/v1/balance
-- **H2 Console**: http://localhost:8080/h2-console
-    - JDBC URL: `jdbc:h2:mem:marketdb`
-    - User: `sa`
-    - Password: нихт
+- **Keycloak**: http://localhost:8085 (admin/admin)
+
+### Тестовые пользователи
+
+| Логин | Пароль | Баланс          |
+|-------|--------|-----------------|
+| user1 | 1234 | 150000.00 Денег |
+| user2 | 1234 | 50000.00  Денег |_

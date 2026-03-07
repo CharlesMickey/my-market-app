@@ -28,18 +28,18 @@ public class OrderService {
 
     }
 
-    public Mono<Long> createOrder(Map<Long, Integer> cartItems) {
+    public Mono<Long> createOrder(Long userId, Map<Long, Integer> cartItems) {
         return Flux.fromIterable(cartItems.entrySet())
                 .flatMap(entry -> itemRepository.findById(entry.getKey())
-                        .map(item -> {
-                            OrderItem oi = new OrderItem();
-                            oi.setItemId(item.getId());
-                            oi.setCount(entry.getValue());
-                            oi.setPrice(item.getPrice());
-                            oi.setOrderId(null);
-                            long totalPrice = item.getPrice() * entry.getValue();
-                            return new ItemOrderData(oi, totalPrice);
-                        }))
+                .map(item -> {
+                    OrderItem oi = new OrderItem();
+                    oi.setItemId(item.getId());
+                    oi.setCount(entry.getValue());
+                    oi.setPrice(item.getPrice());
+                    oi.setOrderId(null);
+                    long totalPrice = item.getPrice() * entry.getValue();
+                    return new ItemOrderData(oi, totalPrice);
+                }))
                 .collectList()
                 .flatMap(list -> {
                     long totalSum = list.stream()
@@ -47,30 +47,32 @@ public class OrderService {
                             .sum();
 
                     Order order = new Order();
+                    order.setUserId(userId);
                     order.setCreatedAt(LocalDateTime.now());
                     order.setTotalSum(totalSum);
 
                     return orderRepository.save(order)
-                            .flatMap(savedOrder
-                                    -> Flux.fromIterable(list)
-                                    .flatMap(data -> {
-                                        OrderItem oi = data.orderItem();
-                                        oi.setOrderId(savedOrder.getId());
-                                        return orderItemRepository.save(oi);
-                                    })
-                                    .then(Mono.just(savedOrder.getId()))
+                            .flatMap(savedOrder -> Flux.fromIterable(list)
+                            .flatMap(data -> {
+                                OrderItem oi = data.orderItem();
+                                oi.setOrderId(savedOrder.getId());
+                                return orderItemRepository.save(oi);
+                            })
+                            .then(Mono.just(savedOrder.getId()))
                             );
                 });
     }
 
-    public Flux<OrderDto> getAllOrders() {
-        return orderRepository.findAll()
+    public Flux<OrderDto> getAllOrdersForCurrentUser(Long userId) {
+        return orderRepository.findAllByUserId(userId)
                 .flatMap(this::enhanceOrderWithItems);
     }
 
-    public Mono<OrderDto> getOrderById(Long id) {
-        return orderRepository.findById(id)
-                .flatMap(this::enhanceOrderWithItems);
+    public Mono<OrderDto> getOrderByIdForUser(Long orderId, Long userId) {
+        return orderRepository.findById(orderId)
+                .filter(order -> order.getUserId().equals(userId))
+                .flatMap(this::enhanceOrderWithItems)
+                .switchIfEmpty(Mono.error(new RuntimeException("Order not found or access denied")));
     }
 
     public Mono<Void> deleteOrder(Long id) {
@@ -80,14 +82,14 @@ public class OrderService {
     private Mono<OrderDto> enhanceOrderWithItems(Order order) {
         return orderItemRepository.findAllByOrderId(order.getId())
                 .flatMap(oi -> itemRepository.findById(oi.getItemId())
-                        .map(item -> {
-                            OrderItemDto dto = new OrderItemDto();
-                            dto.setId(oi.getItemId());
-                            dto.setTitle(item.getTitle());
-                            dto.setCount(oi.getCount());
-                            dto.setPrice(oi.getPrice());
-                            return dto;
-                        })
+                .map(item -> {
+                    OrderItemDto dto = new OrderItemDto();
+                    dto.setId(oi.getItemId());
+                    dto.setTitle(item.getTitle());
+                    dto.setCount(oi.getCount());
+                    dto.setPrice(oi.getPrice());
+                    return dto;
+                })
                 )
                 .collectList()
                 .map(items -> {

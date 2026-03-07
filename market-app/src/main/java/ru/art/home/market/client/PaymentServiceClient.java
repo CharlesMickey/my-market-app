@@ -66,6 +66,10 @@ public class PaymentServiceClient {
     private Mono<PaymentBalanceDto> handleBalanceError(Throwable error) {
         if (error instanceof WebClientResponseException) {
             WebClientResponseException wcre = (WebClientResponseException) error;
+            if (wcre.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                return Mono.error(new PaymentServiceUnavailableException(
+                        "Payment service unauthorized - check OAuth2 configuration", error));
+            }
             if (wcre.getStatusCode() == HttpStatus.SERVICE_UNAVAILABLE
                     || wcre.getStatusCode() == HttpStatus.INTERNAL_SERVER_ERROR) {
                 return Mono.error(new PaymentServiceUnavailableException(
@@ -79,6 +83,10 @@ public class PaymentServiceClient {
     private Mono<PaymentResponseDto> handlePaymentError(Throwable error) {
         if (error instanceof WebClientResponseException) {
             WebClientResponseException wcre = (WebClientResponseException) error;
+            if (wcre.getStatusCode() == HttpStatus.UNAUTHORIZED) {
+                return Mono.error(new PaymentServiceUnavailableException(
+                        "Payment service unauthorized - check OAuth2 configuration", error));
+            }
             if (wcre.getStatusCode() == HttpStatus.BAD_REQUEST) {
                 try {
                     PaymentResponseDto response = wcre.getResponseBodyAs(PaymentResponseDto.class);

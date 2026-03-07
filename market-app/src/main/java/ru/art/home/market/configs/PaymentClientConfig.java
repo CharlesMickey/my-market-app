@@ -3,8 +3,11 @@ package ru.art.home.market.configs;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.oauth2.client.AuthorizedClientServiceReactiveOAuth2AuthorizedClientManager;
+import org.springframework.security.oauth2.client.InMemoryReactiveOAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.reactive.function.client.ServerOAuth2AuthorizedClientExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
-import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import lombok.extern.slf4j.Slf4j;
@@ -18,14 +21,26 @@ public class PaymentClientConfig {
     private String paymentServiceUrl;
 
     @Bean
-    public WebClient paymentWebClient() {
-        ExchangeStrategies strategies = ExchangeStrategies.builder()
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
-                .build();
+    public AuthorizedClientServiceReactiveOAuth2AuthorizedClientManager authorizedClientManager(
+            ReactiveClientRegistrationRepository clientRegistrationRepository) {
+
+        var authorizedClientService = new InMemoryReactiveOAuth2AuthorizedClientService(clientRegistrationRepository);
+        return new AuthorizedClientServiceReactiveOAuth2AuthorizedClientManager(
+                clientRegistrationRepository, authorizedClientService);
+    }
+
+    @Bean
+    public WebClient paymentWebClient(
+            ReactiveClientRegistrationRepository clientRegistrationRepository,
+            AuthorizedClientServiceReactiveOAuth2AuthorizedClientManager authorizedClientManager) {
+
+        ServerOAuth2AuthorizedClientExchangeFilterFunction oauth2Filter
+                = new ServerOAuth2AuthorizedClientExchangeFilterFunction(authorizedClientManager);
+        oauth2Filter.setDefaultClientRegistrationId("keycloak");
 
         return WebClient.builder()
                 .baseUrl(paymentServiceUrl)
-                .exchangeStrategies(strategies)
+                .filter(oauth2Filter)
                 .filter(logRequest())
                 .filter(logResponse())
                 .build();
@@ -34,9 +49,6 @@ public class PaymentClientConfig {
     private ExchangeFilterFunction logRequest() {
         return ExchangeFilterFunction.ofRequestProcessor(clientRequest -> {
             log.debug("Request: {} {}", clientRequest.method(), clientRequest.url());
-            clientRequest.headers().forEach((name, values)
-                    -> values.forEach(value -> log.debug("{}: {}", name, value))
-            );
             return Mono.just(clientRequest);
         });
     }
