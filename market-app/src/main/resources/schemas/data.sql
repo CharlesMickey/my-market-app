@@ -25,3 +25,25 @@ VALUES
         'images/q.jpg',
         7999
     );
+
+INSERT INTO
+    users (username, password, enabled, balance)
+VALUES
+    (
+        'user1',
+        '$2a$10$h..ktS./DPIFxlItcSYeMOgXvPnFPhOdosmrQnysneuVkL/IzIA66',
+        true,
+        150000
+    ),
+    (
+        'user2',
+        '$2a$10$h..ktS./DPIFxlItcSYeMOgXvPnFPhOdosmrQnysneuVkL/IzIA66',
+        true,
+        50000
+    );
+
+INSERT INTO
+    authorities (username, authority)
+VALUES
+    ('user1', 'ROLE_USER'),
+    ('user2', 'ROLE_USER');

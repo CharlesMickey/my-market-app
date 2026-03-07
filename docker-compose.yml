@@ -1,4 +1,4 @@
-version: '3.8'
+version: '3.9'
 
 services:
   redis:
@@ -16,6 +16,18 @@ services:
       timeout: 5s
       retries: 5
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1.4
+    container_name: bom-bom-keycloak
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8085:8080"
+    networks:
+      - bom-bom-network
+
   market-app:
     build:
       context: .
@@ -28,9 +40,13 @@ services:
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATA_REDIS_PORT=6379
       - PAYMENT_SERVICE_URL=http://payment-service:8082
+      - KEYCLOAK_ISSUER_URI=http://host.docker.internal:8085/realms/bom-bom-market
+      - KEYCLOAK_CLIENT_SECRET=3EEDTFbjb0pFREJD64Cveo2lTkjPAfMn
     depends_on:
       redis:
         condition: service_healthy
+      keycloak:
+        condition: service_started
     networks:
       - bom-bom-network
 

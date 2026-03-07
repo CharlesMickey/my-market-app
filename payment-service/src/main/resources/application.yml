@@ -6,8 +6,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8085/realms/bom-bom-market
-          jwk-set-uri: http://localhost:8085/realms/bom-bom-market/protocol/openid-connect/certs
+          issuer-uri: http://host.docker.internal:8085/realms/bom-bom-market
 
 server:
   port: 8082

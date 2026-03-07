@@ -1,101 +1,107 @@
 package ru.art.home.payment.controllers;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-
-import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.security.oauth2.jwt.Jwt;
 import reactor.core.publisher.Mono;
-import ru.art.home.payment.model.PaymentRequest;
-import ru.art.home.payment.model.Transaction;
+import ru.art.home.payment.model.*;
 import ru.art.home.payment.services.PaymentService;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@WebFluxTest(PaymentController.class)
 class PaymentControllerTest {
 
-    @Autowired
-    private WebTestClient webTestClient;
-
-    @MockitoBean
     private PaymentService paymentService;
+    private PaymentController paymentController;
+    private Jwt testJwt;
 
-    @Test
-    void processPayment_success() {
-
-        Transaction transaction = new Transaction();
-        transaction.setId("tx-123");
-        transaction.setStatus(Transaction.TransactionStatus.SUCCESS);
-        transaction.setBalanceBefore(500L);
-        transaction.setBalanceAfter(300L);
-        transaction.setDescription("OK");
-
-        when(paymentService.processPayment(100L, 200L, null))
-                .thenReturn(Mono.just(transaction));
-
-        PaymentRequest request = new PaymentRequest();
-        request.setOrderId(100L);
-        request.setAmount(200L);
-
-        webTestClient.post()
-                .uri("/api/v1/payments")
-                .bodyValue(request)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$.success").isEqualTo(true)
-                .jsonPath("$.transactionId").isEqualTo("tx-123")
-                .jsonPath("$.newBalance").isEqualTo(300);
-
-        verify(paymentService).processPayment(100L, 200L, null);
+    @BeforeEach
+    void setUp() {
+        paymentService = mock(PaymentService.class);
+        paymentController = new PaymentController(paymentService);
+        testJwt = mock(Jwt.class);
+        when(testJwt.getClaimAsString("client_id")).thenReturn("client123");
     }
 
     @Test
-    void processPayment_insufficientFunds() {
+    void testGetBalanceSuccess() {
+        Balance balance = new Balance();
+        balance.setAmount(5000L);
+        balance.setCurrency("RUB");
 
-        Transaction transaction = new Transaction();
-        transaction.setId("tx-456");
-        transaction.setStatus(Transaction.TransactionStatus.FAILED_OTHER);
-        transaction.setBalanceBefore(100L);
-        transaction.setBalanceAfter(100L);
-        transaction.setDescription("Insufficient funds");
+        when(paymentService.getBalance("client123")).thenReturn(Mono.just(balance));
 
-        when(paymentService.processPayment(100L, 200L, null))
-                .thenReturn(Mono.just(transaction));
+        var responseMono = paymentController.getBalance(Mono.just(testJwt));
 
-        PaymentRequest request = new PaymentRequest();
-        request.setOrderId(100L);
-        request.setAmount(200L);
+        BalanceResponse response = responseMono.block().getBody();
 
-        webTestClient.post()
-                .uri("/api/v1/payments")
-                .bodyValue(request)
-                .exchange()
-                .expectStatus().isBadRequest()
-                .expectBody()
-                .jsonPath("$.success").isEqualTo(false)
-                .jsonPath("$.message").isEqualTo("Insufficient funds");
+        assertNotNull(response);
+        assertEquals(5000L, response.getBalance());
+        assertEquals("RUB", response.getCurrency());
 
-        verify(paymentService).processPayment(100L, 200L, null);
+        verify(paymentService, times(1)).getBalance("client123");
     }
 
     @Test
-    void processPayment_invalidRequest() {
+    void testProcessPaymentSuccess() {
+        PaymentRequest request = new PaymentRequest();
+        request.setOrderId(1L);
+        request.setAmount(1000L);
+        request.setDescription("Test payment");
 
-        PaymentRequest request = new PaymentRequest(); // пустой
+        Transaction transaction = Transaction.createSuccess(
+                1L, 1000L, 5000L, 4000L, "Test payment"
+        );
 
-        webTestClient.post()
-                .uri("/api/v1/payments")
-                .bodyValue(request)
-                .exchange()
-                .expectStatus().isBadRequest()
-                .expectBody()
-                .jsonPath("$.success").isEqualTo(false)
-                .jsonPath("$.message")
-                .isEqualTo("Invalid request: amount and orderId are required");
+        when(paymentService.processPayment("client123", 1L, 1000L, "Test payment"))
+                .thenReturn(Mono.just(transaction));
 
-        verifyNoInteractions(paymentService);
+        var responseMono = paymentController.processPayment(request, Mono.just(testJwt));
+
+        PaymentResponse response = responseMono.block().getBody();
+
+        assertNotNull(response);
+        assertTrue(response.getSuccess());
+        assertEquals(4000L, response.getNewBalance());
+        assertEquals("Payment processed successfully", response.getMessage());
+    }
+
+    @Test
+    void testProcessPaymentInsufficientFunds() {
+        PaymentRequest request = new PaymentRequest();
+        request.setOrderId(1L);
+        request.setAmount(10000L);
+
+        Transaction failedTx = Transaction.createFailed(
+                1L, 10000L, 5000L,
+                Transaction.TransactionStatus.FAILED_INSUFFICIENT_FUNDS,
+                "Insufficient funds"
+        );
+
+        when(paymentService.processPayment("client123", 1L, 10000L, null))
+                .thenReturn(Mono.just(failedTx));
+
+        var responseMono = paymentController.processPayment(request, Mono.just(testJwt));
+
+        PaymentResponse response = responseMono.block().getBody();
+
+        assertNotNull(response);
+        assertFalse(response.getSuccess());
+        assertEquals(5000L, response.getNewBalance());
+        assertEquals("Insufficient funds", response.getMessage());
+    }
+
+    @Test
+    void testProcessPaymentInvalidRequest() {
+        PaymentRequest request = new PaymentRequest();
+
+        var responseMono = paymentController.processPayment(request, Mono.just(testJwt));
+
+        PaymentResponse response = responseMono.block().getBody();
+
+        assertNotNull(response);
+        assertFalse(response.getSuccess());
+        assertTrue(response.getMessage().contains("Invalid request"));
     }
 }

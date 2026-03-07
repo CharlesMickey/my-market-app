@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Balance {
+
     private Long amount;
     private String currency = "RUB";
 }

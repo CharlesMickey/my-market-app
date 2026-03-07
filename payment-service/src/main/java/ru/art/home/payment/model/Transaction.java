@@ -1,16 +1,17 @@
 package ru.art.home.payment.model;
 
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Transaction {
+
     private String id;
     private Long orderId;
     private Long amount;
@@ -25,8 +26,8 @@ public class Transaction {
     }
 
     public static Transaction createSuccess(Long orderId, Long amount,
-                                            Long balanceBefore, Long balanceAfter,
-                                            String description) {
+            Long balanceBefore, Long balanceAfter,
+            String description) {
         return new Transaction(
                 UUID.randomUUID().toString(),
                 orderId,
@@ -40,9 +41,9 @@ public class Transaction {
     }
 
     public static Transaction createFailed(Long orderId, Long amount,
-                                           Long balanceBefore,
-                                           TransactionStatus status,
-                                           String description) {
+            Long balanceBefore,
+            TransactionStatus status,
+            String description) {
         return new Transaction(
                 UUID.randomUUID().toString(),
                 orderId,

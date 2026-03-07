@@ -37,7 +37,6 @@ public class RedisConfig {
         return factory;
     }
 
-
     @Bean
     public ReactiveRedisTemplate<String, Object> reactiveRedisTemplate(
             ReactiveRedisConnectionFactory reactiveRedisConnectionFactory) {
